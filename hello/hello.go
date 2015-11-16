@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/wittyameta/sudoku-solver/stringutil"
 )
 
 func main() {
+	var yo,zo string
+	fmt.Scanf("%s%s",&yo,&zo)
 	fmt.Printf("Hello, world.\n")
-	fmt.Println(stringutil.Reverse("Hello, world"))
+	fmt.Println(yo,zo)
 	var x,y string
 	fmt.Scanf("%s%s\n",&x,&y)
 	fmt.Println("first",x,y)

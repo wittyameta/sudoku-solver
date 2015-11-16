@@ -1,39 +1,60 @@
 package datatypes
 
+import "fmt"
+
+//Position yo
 type Position struct {
-	x int
-	y int
+	X int
+	Y int
 }
 
 type Value struct {
-	val      int
-	possible [9]bool
+	Val      int
+	Possible map[int]bool
 }
 
-func NewValue() *Value {
-	possible := [9]bool{true, true, true, true, true, true, true, true, true}
+func InitValue() *Value {
+	possible := make(map[int]bool)
+	for i := 1; i < 10; i++ {
+		possible[i] = true
+	}
 	v := Value{0, possible}
 	return &v
 }
 
+func SetValue(val int) *Value {
+	possible := make(map[int]bool)
+	possible[val] = true
+	v := Value{val, possible}
+	return &v
+}
+
 type Cell struct {
-	pos             Position
-	iterationValues map[int]Value
+	Pos             Position
+	IterationValues map[int]Value
 }
 
 func NewCell(x int, y int) *Cell {
 	pos := Position{x, y}
-	value := *NewValue()
+	value := *InitValue()
 	iterationValues := make(map[int]Value)
 	iterationValues[0] = value
 	cell := Cell{pos, iterationValues}
 	return &cell
 }
 
+func NewCellWithValue(x int, y int, val Value) *Cell {
+	pos := Position{x, y}
+	iterationValues := make(map[int]Value)
+	iterationValues[0] = val
+	cell := Cell{pos, iterationValues}
+	return &cell
+}
+
 type Backtrack struct {
-	currentPos         Position
-	currentVal         Value
-	backtrackPositions map[Position]bool
+	CurrentPos         Position
+	CurrentVal         Value
+	BacktrackPositions map[Position]bool
 }
 
 func NewBacktrack(x int, y int, val Value) *Backtrack {
@@ -56,3 +77,22 @@ func (s *Stack) Pop() Backtrack {
 }
 
 type Grid [9][9]Cell
+
+func InitGrid() *Grid {
+	grid := Grid{}
+	for i := 0; i < 9; i++ {
+		for j := 0; j < 9; j++ {
+			grid[i][j] = *NewCell(i, j)
+		}
+	}
+	return &grid
+}
+
+func (grid *Grid) Print(iter int) {
+	for i := 0; i < 9; i++ {
+		for j := 0; j < 9; j++ {
+			fmt.Printf("%d ",grid[i][j].IterationValues[iter].Val)
+		}
+		fmt.Println()
+	}
+}
