@@ -8,14 +8,13 @@ import (
 )
 
 func main() {
-	val := *datatypes.SetValue(1)
-	fmt.Println("done", val)
 	grid := *datatypes.InitGrid()
 	for i := 0; i < 9; i++ {
 		readRow(&grid, i)
-		fmt.Println(grid[i]) // remove
-		grid.Print(0) // remove
 	}
+	grid.Print(0) // remove
+	solve(&grid)
+	grid.Print(0)
 }
 
 func readRow(grid *datatypes.Grid, rownum int) {
@@ -30,11 +29,11 @@ func readRow(grid *datatypes.Grid, rownum int) {
 		panic(err)
 	}
 	for i, elem := range row {
-		initValue := grid[rownum][i].IterationValues[0]
+		val := &grid[rownum][i].IterationValues
 		input := verifyElement(elem)
 		if input > 0 {
-			if initValue.Possible[input] {
-				grid[rownum][i].IterationValues[0] = *datatypes.SetValue(input)
+			if (*val)[0].Possible[input] {
+				(*val)[0] = *datatypes.SetValue(input)
 			}
 		}
 	}
@@ -55,6 +54,73 @@ func verifyElement(elem string) int {
 	}
 }
 
-func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int) {
+func solve(grid *datatypes.Grid) {
+	for i := 0; i < 9; i++ {
+		for j := 0; j < 9; j++ {
+			val := *grid[i][j].IterationValues[0].Val
+			if val > 0 {
+				eliminatePossibilities(grid, 0, i, j, val)
+			}
+		}
+	}
+}
 
+func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int, val int) {
+	for i := 0; i < 9; i++ {
+		if i == row {
+			continue
+		}
+		// TODO currently for row, check for col and block as well
+		cell := &grid[i][column]
+		// TODO lock on cell
+		setValue, updated, backtrack := updateCell(cell, iteration, val)
+		// TODO unlock cell
+		if setValue > 0 {
+			eliminatePossibilities(grid, iteration, i, column, setValue)
+		}
+		if updated {
+			uniquePositions := checkIfUnique(grid, iteration, val)
+			for _, pos := range uniquePositions {
+				// TODO
+				// find cell
+				//lock cell
+				// update cell - set value
+				// unlock cell
+			}
+		}
+		if backtrack {
+			if iteration == 0 {
+				panic("no solution possible")
+			}
+			// TODO
+		}
+	}
+}
+
+// returns setValue,updated,backtrack (int,bool,bool)
+func updateCell(cell *datatypes.Cell, iteration int, valToDelete int) (int, bool, bool) {
+	existingValue := cell.IterationValues[iteration]
+	if *existingValue.Val == valToDelete {
+		return 0, false, true
+	}
+	updated := false
+	setValue := 0
+	if *existingValue.Val == 0 && existingValue.Possible[valToDelete] {
+		updated = true
+		delete(existingValue.Possible, valToDelete)
+		if len(existingValue.Possible) == 1 {
+			for key := range existingValue.Possible {
+				setValue = key
+				*existingValue.Val = key
+			}
+		}
+	}
+	return setValue, updated, false
+}
+
+// TODO add support for row/col/block
+func checkIfUnique(grid *datatypes.Grid, iteration int, valDeleted int) []datatypes.Position {
+	// TODO
+	var uniquePositions []datatypes.Position
+	return uniquePositions
 }

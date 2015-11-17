@@ -4,12 +4,14 @@ import "fmt"
 
 //Position yo
 type Position struct {
+	// X is yo
 	X int
+	// Y is yo
 	Y int
 }
 
 type Value struct {
-	Val      int
+	Val      *int
 	Possible map[int]bool
 }
 
@@ -18,14 +20,15 @@ func InitValue() *Value {
 	for i := 1; i < 10; i++ {
 		possible[i] = true
 	}
-	v := Value{0, possible}
+	val := 0
+	v := Value{&val, possible}
 	return &v
 }
 
 func SetValue(val int) *Value {
 	possible := make(map[int]bool)
 	possible[val] = true
-	v := Value{val, possible}
+	v := Value{&val, possible}
 	return &v
 }
 
@@ -91,8 +94,9 @@ func InitGrid() *Grid {
 func (grid *Grid) Print(iter int) {
 	for i := 0; i < 9; i++ {
 		for j := 0; j < 9; j++ {
-			fmt.Printf("%d ",grid[i][j].IterationValues[iter].Val)
+			fmt.Printf("%d ", *grid[i][j].IterationValues[iter].Val)
 		}
 		fmt.Println()
 	}
+	fmt.Println()
 }
