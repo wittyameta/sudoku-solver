@@ -1,6 +1,9 @@
 package datatypes
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 //Position yo
 type Position struct {
@@ -35,6 +38,7 @@ func SetValue(val int) *Value {
 type Cell struct {
 	Pos             Position
 	IterationValues map[int]Value
+	Mutex           sync.Mutex
 }
 
 func NewCell(x int, y int) *Cell {
@@ -42,7 +46,7 @@ func NewCell(x int, y int) *Cell {
 	value := *InitValue()
 	iterationValues := make(map[int]Value)
 	iterationValues[0] = value
-	cell := Cell{pos, iterationValues}
+	cell := Cell{pos, iterationValues, sync.Mutex{}}
 	return &cell
 }
 
@@ -50,7 +54,7 @@ func NewCellWithValue(x int, y int, val Value) *Cell {
 	pos := Position{x, y}
 	iterationValues := make(map[int]Value)
 	iterationValues[0] = val
-	cell := Cell{pos, iterationValues}
+	cell := Cell{pos, iterationValues, sync.Mutex{}}
 	return &cell
 }
 

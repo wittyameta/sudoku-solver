@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/wittyameta/sudoku-solver/datatypes"
 )
@@ -12,15 +13,15 @@ const max int = 9
 
 func main() {
 	grid := *datatypes.InitGrid()
+	count := 0
 	for i := 0; i < max; i++ {
-		readRow(&grid, i)
+		count += readRow(&grid, i)
 	}
-	grid.Print(0) // TODO remove
-	solve(&grid)
+	solve(&grid, count)
 	grid.Print(0)
 }
 
-func readRow(grid *datatypes.Grid, rownum int) {
+func readRow(grid *datatypes.Grid, rownum int) (count int) {
 	var row [max]string
 	format := ""
 	for i := 0; i < max; i++ {
@@ -37,9 +38,13 @@ func readRow(grid *datatypes.Grid, rownum int) {
 		if input > 0 {
 			if (*val)[0].Possible[input] {
 				(*val)[0] = *datatypes.SetValue(input)
+				count++
+			} else {
+				panic("no solution possible")
 			}
 		}
 	}
+	return
 }
 
 func verifyElement(elem string) int {
@@ -57,19 +62,38 @@ func verifyElement(elem string) int {
 	}
 }
 
-func solve(grid *datatypes.Grid) {
+func solve(grid *datatypes.Grid, count int) {
+	wg := sync.WaitGroup{}
+	wg.Add(count)
+	verificationCount := 0
 	for i := 0; i < max; i++ {
 		for j := 0; j < max; j++ {
 			val := *grid[i][j].IterationValues[0].Val
 			if val > 0 {
-				eliminatePossibilities(grid, 0, i, j, val)
+				if verificationCount < count {
+					verificationCount++
+				} else {
+					wg.Add(1)
+				}
+				eliminateUsingGivenValues(grid, 0, i, j, val, &wg)
 			}
 		}
 	}
+	potentialCountDiff := count - verificationCount
+	if potentialCountDiff > 0 {
+		wg.Add(potentialCountDiff)
+	}
+	wg.Wait()
+}
+
+func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, column int, val int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	eliminatePossibilities(grid, 0, row, column, val)
 }
 
 // Called when a number is set in a cell.
 // Eliminates the possibilities from the grid given a number at a row,col
+// TODO eliminate only for row/col/block required
 func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int, val int) {
 	for i := 0; i < max; i++ {
 		if i == row {
@@ -97,11 +121,10 @@ func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column
 // Called when a number is set in a cell.
 // Eliminates the possibilities from the grid given a number at a i,j
 func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i int, j int, val int) {
-	// TODO currently for row, check for col and block as well
 	cell := &grid[i][j]
-	// TODO lock on cell
+	cell.Mutex.Lock()
 	setValue, updated, backtrack := updateCell(cell, iteration, val)
-	// TODO unlock cell
+	cell.Mutex.Unlock()
 	if setValue > 0 {
 		eliminatePossibilities(grid, iteration, i, j, setValue)
 	}
@@ -113,9 +136,9 @@ func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i in
 		}
 		for _, pos := range uniquePositions {
 			setCell := &grid[pos.X][pos.Y]
-			//TODO lock setCell
+			setCell.Mutex.Lock()
 			isValueSet := setValueForCell(setCell, iteration, val)
-			//TODO unlock setCell
+			setCell.Mutex.Unlock()
 			if isValueSet {
 				eliminatePossibilities(grid, iteration, pos.X, pos.Y, val)
 			} else {
