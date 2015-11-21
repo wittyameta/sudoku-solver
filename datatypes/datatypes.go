@@ -104,3 +104,17 @@ func (grid *Grid) Print(iter int) {
 	}
 	fmt.Println()
 }
+
+func (grid *Grid) PrintAll(iter int) {
+	for i := 0; i < 9; i++ {
+		for j := 0; j < 9; j++ {
+			possibilities := grid[i][j].IterationValues[iter].Possible
+			for k := range possibilities {
+				fmt.Printf("%d,", k)
+			}
+			fmt.Printf(" ")
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+}

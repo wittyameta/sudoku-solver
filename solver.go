@@ -8,7 +8,11 @@ import (
 	"github.com/wittyameta/sudoku-solver/datatypes"
 )
 
-// TODO for all loops check if current cell needs to be excluded
+// TODO
+// for all loops check if current cell needs to be excluded
+// backtrack
+// function return instead of value
+// when num is set, check if after elimination in nearby block, the num is specific to a row/col
 const max int = 9
 
 func main() {
@@ -19,6 +23,7 @@ func main() {
 	}
 	solve(&grid, count)
 	grid.Print(0)
+	grid.PrintAll(0)
 }
 
 func readRow(grid *datatypes.Grid, rownum int) (count int) {
@@ -75,7 +80,7 @@ func solve(grid *datatypes.Grid, count int) {
 				} else {
 					wg.Add(1)
 				}
-				eliminateUsingGivenValues(grid, 0, i, j, val, &wg) // TODO goroutine
+				go eliminateUsingGivenValues(grid, i, j, val, &wg)
 			}
 		}
 	}
@@ -86,9 +91,14 @@ func solve(grid *datatypes.Grid, count int) {
 	wg.Wait()
 }
 
-func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, column int, val int, wg *sync.WaitGroup) {
+func eliminateUsingGivenValues(grid *datatypes.Grid, row int, column int, val int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	eliminatePossibilities(grid, 0, row, column, val)
+	for i := 1; i <= max; i++ {
+		if i != val {
+			checkIfUniqueAndEliminate(grid, 0, row, column, i)
+		}
+	}
 }
 
 // Called when a number is set in a cell.
@@ -129,37 +139,7 @@ func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i in
 		eliminatePossibilities(grid, iteration, i, j, setValue)
 	}
 	if updated {
-		fmt.Println("for", i, j, val)
-		fmt.Println(cell.IterationValues[0].Possible, *cell.IterationValues[0].Val)
-		fmt.Println(grid[i][j].IterationValues[0].Possible, *grid[i][j].IterationValues[0].Val)
-		uniquePositions, conflict := checkIfUnique(grid, iteration, val, datatypes.Position{X: i, Y: j})
-		if conflict {
-			fmt.Println("backtrack logic") //TODO remove
-			// TODO backtrack
-		}
-		for _, pos := range uniquePositions {
-			setCell := &grid[pos.X][pos.Y]
-			setCell.Mutex.Lock()
-			eliminatedValues, isValueSet := setValueForCell(setCell, iteration, val)
-			setCell.Mutex.Unlock()
-			if isValueSet {
-				fmt.Println("value is set", pos.X, pos.Y, val)
-				fmt.Println(grid[pos.X][pos.Y].IterationValues[0].Possible, *grid[pos.X][pos.Y].IterationValues[0].Val)
-				for _, eliminatedVal := range eliminatedValues {
-					// check unique
-					// TODO
-					if eliminatedVal == 0 {
-						panic("0")
-					} // TODO remove
-					checkIfUniqueAndEliminate(grid, iteration, pos.X, pos.Y, eliminatedVal)
-					fmt.Println(eliminatedVal)
-				}
-				eliminatePossibilities(grid, iteration, pos.X, pos.Y, val)
-			} else {
-				fmt.Println("backtrack while set logic") //TODO remove
-				// TODO backtrack
-			}
-		}
+		checkIfUniqueAndEliminate(grid, iteration, i, j, val)
 	}
 	if backtrack {
 		if iteration == 0 {
@@ -213,7 +193,6 @@ func updateCell(cell *datatypes.Cell, iteration int, valToDelete int) (int, bool
 func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int, val int) {
 	uniquePositions, conflict := checkIfUnique(grid, iteration, val, datatypes.Position{X: i, Y: j})
 	if conflict {
-		fmt.Println("backtrack logic", i, j, val) //TODO remove
 		// TODO backtrack
 		panic("yo") // remove
 	}
@@ -226,14 +205,11 @@ func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int
 			fmt.Println("value is set", pos.X, pos.Y, val)
 			fmt.Println(grid[pos.X][pos.Y].IterationValues[0].Possible, *grid[pos.X][pos.Y].IterationValues[0].Val)
 			for _, eliminatedVal := range eliminatedValues {
-				// check unique
-				// TODO
 				checkIfUniqueAndEliminate(grid, iteration, pos.X, pos.Y, eliminatedVal)
-				fmt.Println(eliminatedVal)
 			}
 			eliminatePossibilities(grid, iteration, pos.X, pos.Y, val)
 		} else {
-			fmt.Println("backtrack while set logic") //TODO remove
+			panic("yo") // remove
 			// TODO backtrack
 		}
 	}
