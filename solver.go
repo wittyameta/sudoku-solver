@@ -433,11 +433,7 @@ func backtrack(grid *datatypes.Grid, positions map[datatypes.Position]bool, iter
 			}
 			b := *datatypes.NewBacktrack(pos, setValue) // TODO 4
 			if eliminateUsingGivenValues(grid, iteration+1, pos.X, pos.Y, val, &b) {
-				grid.Print()
-				fmt.Println("backtrack after", pos.X, pos.Y, val)
 				// TODO revert todo4,1
-				copyValuesForNextIteration(grid, positions, iteration)
-				*grid[pos.X][pos.Y].Val = 0
 			} else {
 				updatedPositions := remainingPositions(grid, positions)
 				if len(updatedPositions) == 0 {
@@ -449,13 +445,13 @@ func backtrack(grid *datatypes.Grid, positions map[datatypes.Position]bool, iter
 					grid.Print()
 				} else {
 					fmt.Println("go next level. remaining cells:", len(updatedPositions))
-					grid.Print()
 					backtrack(grid, updatedPositions, iteration+1)
 				}
 				// next val in stack
 			}
+			copyValuesForNextIteration(grid, positions, iteration)
 		}
-		return // TODO remove
+		return
 	}
 }
 
