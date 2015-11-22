@@ -35,7 +35,18 @@ func SetValue(val int) *Value {
 	return &v
 }
 
+func CopyValue(value Value) *Value {
+	possible := make(map[int]bool)
+	for key := range value.Possible {
+		possible[key] = true
+	}
+	val := *value.Val
+	v := Value{&val, possible}
+	return &v
+}
+
 type Cell struct {
+	Val             *int
 	Pos             Position
 	IterationValues map[int]Value
 	Mutex           sync.Mutex
@@ -46,7 +57,8 @@ func NewCell(x int, y int) *Cell {
 	value := *InitValue()
 	iterationValues := make(map[int]Value)
 	iterationValues[0] = value
-	cell := Cell{pos, iterationValues, sync.Mutex{}}
+	val := 0
+	cell := Cell{&val, pos, iterationValues, sync.Mutex{}}
 	return &cell
 }
 
@@ -54,7 +66,8 @@ func NewCellWithValue(x int, y int, val Value) *Cell {
 	pos := Position{x, y}
 	iterationValues := make(map[int]Value)
 	iterationValues[0] = val
-	cell := Cell{pos, iterationValues, sync.Mutex{}}
+	currentVal := *val.Val
+	cell := Cell{&currentVal, pos, iterationValues, sync.Mutex{}}
 	return &cell
 }
 
@@ -64,10 +77,9 @@ type Backtrack struct {
 	BacktrackPositions map[Position]bool
 }
 
-func NewBacktrack(x int, y int, val Value) *Backtrack {
-	currentPos := Position{x, y}
+func NewBacktrack(pos Position, value Value) *Backtrack {
 	backTrackPositions := make(map[Position]bool)
-	backtrack := Backtrack{currentPos, val, backTrackPositions}
+	backtrack := Backtrack{pos, value, backTrackPositions}
 	return &backtrack
 }
 
@@ -95,7 +107,17 @@ func InitGrid() *Grid {
 	return &grid
 }
 
-func (grid *Grid) Print(iter int) {
+func (grid *Grid) Print() {
+	for i := 0; i < 9; i++ {
+		for j := 0; j < 9; j++ {
+			fmt.Printf("%d ", *grid[i][j].Val)
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+}
+
+func (grid *Grid) PrintIter(iter int) {
 	for i := 0; i < 9; i++ {
 		for j := 0; j < 9; j++ {
 			fmt.Printf("%d ", *grid[i][j].IterationValues[iter].Val)
