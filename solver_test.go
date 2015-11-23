@@ -16,6 +16,22 @@ func TestVerifyElement(t *testing.T) {
 	}
 }
 
+// TestGetMinMaxPositions verifies the min and max position for a position and identifier.
+func TestGetMinMaxPositions(t *testing.T) {
+	minPos, maxPos := getMinMaxPositions(rowIdentifier, datatypes.Position{X: 1, Y: 2})
+	if (minPos != datatypes.Position{X: 1, Y: 0} || maxPos != datatypes.Position{X: 1, Y: 8}) {
+		t.Error("Expected {1,0},{1,8}; got ", minPos, maxPos)
+	}
+	minPos, maxPos = getMinMaxPositions(colIdentifier, datatypes.Position{X: 1, Y: 2})
+	if (minPos != datatypes.Position{X: 0, Y: 2} || maxPos != datatypes.Position{X: 8, Y: 2}) {
+		t.Error("Expected {0,2},{8,2}; got ", minPos, maxPos)
+	}
+	minPos, maxPos = getMinMaxPositions(blockIdentifier, datatypes.Position{X: 1, Y: 2})
+	if (minPos != datatypes.Position{X: 0, Y: 0} || maxPos != datatypes.Position{X: 2, Y: 2}) {
+		t.Error("Expected {0,0},{2,2}; got ", minPos, maxPos)
+	}
+}
+
 // TestSolve initializes and solves the grid.
 func TestSolve(t *testing.T) {
 	grid := *datatypes.InitGrid()

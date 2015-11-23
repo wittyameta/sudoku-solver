@@ -155,34 +155,16 @@ func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, col
 // When eliminating possibilities from a cell in the block, recursive check is done for row and column only.
 // returns true if there is a conflict while solving for this iteration.
 func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int, val int, identifiers map[string]bool) bool {
-	if identifiers[rowIdentifier] {
-		for i := 0; i < max; i++ {
-			if i == row {
-				continue
-			}
-			if eliminatePossibilitiesForPosition(grid, iteration, i, column, val, map[string]bool{colIdentifier: true, blockIdentifier: true}) {
-				return true
-			}
-		}
-	}
-	if identifiers[colIdentifier] {
-		for j := 0; j < max; j++ {
-			if j == column {
-				continue
-			}
-			if eliminatePossibilitiesForPosition(grid, iteration, row, j, val, map[string]bool{rowIdentifier: true, blockIdentifier: true}) {
-				return true
-			}
-		}
-	}
-	if identifiers[blockIdentifier] {
-		rowMin, columnMin := getBlockTopLeft(row, column)
-		for i := rowMin; i < rowMin+3; i++ {
-			for j := columnMin; j < columnMin+3; j++ {
+	for identifier := range identifiers {
+		defaultIdentifiers := map[string]bool{rowIdentifier: true, colIdentifier: true, blockIdentifier: true}
+		delete(defaultIdentifiers, identifier)
+		minPosition, maxPosition := getMinMaxPositions(identifier, datatypes.Position{X: row, Y: column})
+		for i := minPosition.X; i <= maxPosition.X; i++ {
+			for j := minPosition.Y; j <= maxPosition.Y; j++ {
 				if i == row && j == column {
 					continue
 				}
-				if eliminatePossibilitiesForPosition(grid, iteration, i, j, val, map[string]bool{rowIdentifier: true, colIdentifier: true}) {
+				if eliminatePossibilitiesForPosition(grid, iteration, i, j, val, defaultIdentifiers) {
 					return true
 				}
 			}
