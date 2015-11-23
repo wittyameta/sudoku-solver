@@ -1,3 +1,6 @@
+// author: Jayant Ameta
+// https://github.com/wittyameta
+
 package main
 
 import (
@@ -9,29 +12,33 @@ import (
 	"github.com/wittyameta/sudoku-solver/datatypes"
 )
 
-// TODO
-// when num is set, check if after elimination in nearby block, the num is specific to a row/col
 const max int = 9
-const easy, medium, hard string = "easy", "medium", "hard"
-const rowIdentifier, colIdentifier, blockIdentifier string = "r", "c", "b"
+const easy, medium, hard = "easy", "medium", "hard"
+const rowIdentifier, colIdentifier, blockIdentifier = "r", "c", "b"
 
 var initIdentifiers = map[string]bool{rowIdentifier: true, colIdentifier: true, blockIdentifier: true}
 var numSolutions int
 
 func main() {
 	numSolutions = 0
+	// create the grid.
 	grid := *datatypes.InitGrid()
 	count := 0
 	inputValues := make(map[int]bool)
+	// read input into the grid.
 	for i := 0; i < max; i++ {
 		count += readRow(&grid, i, inputValues)
 	}
+	// At least 17 values, and 8 distinct values are required for a unique solution. (Necessary condition, but not sufficient).
 	if count < 17 || len(inputValues) < 8 {
 		handleError("Too few input values given. At least 17 values, and 8 distinct values must be given.", nil)
 	}
+	// solve using given inputs without making any guess.
 	positions := solve(&grid, count)
+	// make a guess for a position and start solving; backtrack if there is any conflict.
 	solveByGuessing(&grid, positions, 0)
 	fmt.Println("Total solutions:", numSolutions)
+	// Set difficulty as easy if solved without making any guess, medium if number of guesses is less than 9, and hard otherwise.
 	difficultyLevel := easy
 	if len(positions) > 0 {
 		if len(positions) < max {
@@ -43,6 +50,9 @@ func main() {
 	fmt.Println("Difficulty level:", difficultyLevel)
 }
 
+// readRow scans the input, verifies it, and sets the value in the grid.
+// For each integer in the input grid, the corresponding cell is updated with the value of the input.
+// Returns the number of integers in the input.
 func readRow(grid *datatypes.Grid, rownum int, inputValues map[int]bool) (count int) {
 	var row [max]string
 	format := ""
@@ -71,6 +81,7 @@ func readRow(grid *datatypes.Grid, rownum int, inputValues map[int]bool) (count 
 	return
 }
 
+// verifyElement verifies that the input is either "_" or an integer from 1 to 9.
 func verifyElement(elem string) int {
 	if "_" == elem {
 		return 0
@@ -85,6 +96,8 @@ func verifyElement(elem string) int {
 	return n
 }
 
+// solve solves the grid. For each value which is set, a goroutine is started to update the grid.
+// returns a map with entries for positions which are still not set.
 func solve(grid *datatypes.Grid, count int) map[datatypes.Position]bool {
 	wg := sync.WaitGroup{}
 	wg.Add(count)
@@ -110,6 +123,8 @@ func solve(grid *datatypes.Grid, count int) map[datatypes.Position]bool {
 	return initPositions(grid)
 }
 
+// initialElimination starts solving the grid using val at position{row, column}.
+// Iteration count is set to 0 for initial elimination.
 func initialElimination(grid *datatypes.Grid, row int, column int, val int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	if eliminateUsingGivenValues(grid, 0, row, column, val) {
@@ -117,6 +132,8 @@ func initialElimination(grid *datatypes.Grid, row int, column int, val int, wg *
 	}
 }
 
+// eliminateUsingGivenValues starts solving the grid using val at position{row, column} for given iteration.
+// returns true if there is a conflict while solving for this iteration.
 func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, column int, val int) bool {
 	if eliminatePossibilities(grid, iteration, row, column, val, initIdentifiers) {
 		return true
@@ -131,17 +148,20 @@ func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, col
 	return false
 }
 
-// Called when a number is set in a cell.
+// eliminatePossibilities is called when a number is set in a cell.
 // Eliminates the possibilities from the grid given a number at a row,col
-func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int, val int, identifiers map[string]bool) (backtrack bool) {
+// When eliminating possibilities from a cell in the row, recursive check is done for column and block only.
+// When eliminating possibilities from a cell in the column, recursive check is done for row and block only.
+// When eliminating possibilities from a cell in the block, recursive check is done for row and column only.
+// returns true if there is a conflict while solving for this iteration.
+func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int, val int, identifiers map[string]bool) bool {
 	if identifiers[rowIdentifier] {
 		for i := 0; i < max; i++ {
 			if i == row {
 				continue
 			}
-			backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, column, val, map[string]bool{colIdentifier: true, blockIdentifier: true})
-			if backtrack {
-				return
+			if eliminatePossibilitiesForPosition(grid, iteration, i, column, val, map[string]bool{colIdentifier: true, blockIdentifier: true}) {
+				return true
 			}
 		}
 	}
@@ -150,9 +170,8 @@ func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column
 			if j == column {
 				continue
 			}
-			backtrack = eliminatePossibilitiesForPosition(grid, iteration, row, j, val, map[string]bool{rowIdentifier: true, blockIdentifier: true})
-			if backtrack {
-				return
+			if eliminatePossibilitiesForPosition(grid, iteration, row, j, val, map[string]bool{rowIdentifier: true, blockIdentifier: true}) {
+				return true
 			}
 		}
 	}
@@ -163,18 +182,21 @@ func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column
 				if i == row && j == column {
 					continue
 				}
-				backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, j, val, map[string]bool{rowIdentifier: true, colIdentifier: true})
-				if backtrack {
-					return
+				if eliminatePossibilitiesForPosition(grid, iteration, i, j, val, map[string]bool{rowIdentifier: true, colIdentifier: true}) {
+					return true
 				}
 			}
 		}
 	}
-	return
+	return false
 }
 
-// Called when a number is set in a cell.
-// Eliminates the possibilities from the grid given a number at a i,j
+// eliminatePossibilitiesForPosition is called when a number is set in a cell.
+// Eliminates the possibility of having val from the Position{i, j} in the grid for the given iteration.
+// If the updated cell now has only 1 possibility, then that value is set, and elimination from that cell is called.
+// If the cell is updated, then it is checked if the eliminated value now occurs only once
+// in the corresponding row/column/block from this position. If so, then the value is set and elimination called.
+// returns true if there is a conflict while solving for this iteration.
 func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i int, j int, val int, identifiers map[string]bool) bool {
 	cell := &grid[i][j]
 	cell.Mutex.Lock()
@@ -196,7 +218,9 @@ func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i in
 	return false
 }
 
-// return valuesEliminated,isValueSet
+// setValueForCell updates the Value in the cell for given iteration.
+// Possibilities are updated so that it only contains the value to be set.
+// returns the values removed from the map of possibilities, and a boolean to specify if the value was set.
 func setValueForCell(cell *datatypes.Cell, iteration int, setValue int) (eliminatedValues []int, isValueSet bool) {
 	existingValue := cell.IterationValues[iteration]
 	if (existingValue.Possible[setValue] && *cell.Val == 0) || *cell.Val == setValue {
@@ -215,9 +239,10 @@ func setValueForCell(cell *datatypes.Cell, iteration int, setValue int) (elimina
 	return
 }
 
-// Called as part of eliminatePossibilities
+// updateCell is called as part of eliminatePossibilities.
 // Removes the value from the possibilities in the cell
-// returns setValue,updated,backtrack (int,bool,bool)
+// Returns an integer - if only 1 value is possible for this cell,
+// a boolean to specify if the cell was updated , and a boolean to specify a conflict.
 func updateCell(cell *datatypes.Cell, iteration int, valToDelete int) (int, bool, bool) {
 	existingValue := cell.IterationValues[iteration]
 	if *cell.Val == valToDelete {
@@ -239,6 +264,9 @@ func updateCell(cell *datatypes.Cell, iteration int, valToDelete int) (int, bool
 	return setValue, updated, false
 }
 
+// checkIfUniqueAndEliminate checks if the eliminated value now occurs only once
+// in the corresponding identifiers (row/column/block) from this position. If so, then the value is set and elimination called.
+// returns true if there is a conflict while solving for this iteration.
 func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int, val int, identifiers map[string]bool) bool {
 	uniquePositions, conflict := checkIfUnique(grid, iteration, val, datatypes.Position{X: i, Y: j}, identifiers)
 	if conflict {
@@ -265,9 +293,8 @@ func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int
 	return false
 }
 
-// Called when a cell is updated
-// If the value deleted now exists once in the row/block/col, then the cell is returned
-// returns uniquePositions array, backtrack
+// checkIfUnique checks if the value deleted now exists once in the identifiers(row/block/col), then the cell is returned.
+// returns uniquePositions array, and a boolean to specify if there was a conflict
 func checkIfUnique(grid *datatypes.Grid, iteration int, valDeleted int, pos datatypes.Position, identifiers map[string]bool) ([]datatypes.Position, bool) {
 	var uniquePositions []datatypes.Position
 	var uniquePos datatypes.Position
@@ -284,6 +311,9 @@ func checkIfUnique(grid *datatypes.Grid, iteration int, valDeleted int, pos data
 	return uniquePositions, false
 }
 
+// checkIfUniqueWithIdentifier checks if the value deleted now exists once in the identifier(row/block/col), then the cell is returned.
+// Returns uniquePosition, a boolean to specify if unique position was found,
+// and a boolean to specify if there was at least one position with this value - meaning there is no conflict.
 func checkIfUniqueWithIdentifier(grid *datatypes.Grid, iteration int, valDeleted int, pos datatypes.Position, identifier string) (datatypes.Position, bool, bool) {
 	minPosition, maxPosition := getMinMaxPositions(identifier, pos)
 	row := pos.X
@@ -312,6 +342,9 @@ func checkIfUniqueWithIdentifier(grid *datatypes.Grid, iteration int, valDeleted
 	return pos, false, false
 }
 
+// getMinMaxPositions gives the min and max positions for the identifier.
+// The min and max give the range to check for any conflict or elimination.
+// For example: if the identifier is 'rowIdentifier', then the minPos to maxPos will be the whole row ({row,0} to {row,8}).
 func getMinMaxPositions(identifier string, pos datatypes.Position) (minPos datatypes.Position, maxPos datatypes.Position) {
 	if identifier == rowIdentifier {
 		return datatypes.Position{X: pos.X, Y: 0}, datatypes.Position{X: pos.X, Y: max - 1}
@@ -326,10 +359,12 @@ func getMinMaxPositions(identifier string, pos datatypes.Position) (minPos datat
 	return datatypes.Position{X: 0, Y: 0}, datatypes.Position{X: max - 1, Y: max - 1}
 }
 
+// getBlockTopLeft returns the position of the top-left cell from the same block.
 func getBlockTopLeft(x int, y int) (int, int) {
 	return x - x%3, y - y%3
 }
 
+// remainingPositions returns the map with positions where the value is not yet set.
 func remainingPositions(grid *datatypes.Grid, positions map[datatypes.Position]bool) map[datatypes.Position]bool {
 	emptyPositions := make(map[datatypes.Position]bool)
 	for pos := range positions {
@@ -340,6 +375,7 @@ func remainingPositions(grid *datatypes.Grid, positions map[datatypes.Position]b
 	return emptyPositions
 }
 
+// initPositions returns the map with positions where the value is not yet set, before solveByGuessing is called.
 func initPositions(grid *datatypes.Grid) map[datatypes.Position]bool {
 	positions := make(map[datatypes.Position]bool)
 	index := 0
@@ -352,16 +388,22 @@ func initPositions(grid *datatypes.Grid) map[datatypes.Position]bool {
 	return remainingPositions(grid, positions)
 }
 
+// solveByGuessing selects the position with minimum possibilities out of the remaining empty positions.
+// For each of the possible values, the grid is solved. For each conflict, the state is backtracked.
+// If no conflict is there, then recursively solveByGuessing on the remaining empty positions.
+// Prints the solution, if found. Also increments the number of solutions.
 func solveByGuessing(grid *datatypes.Grid, positions map[datatypes.Position]bool, iteration int) {
-	// grid copy
+	// if all positions have been filled, then return
 	if len(positions) == 0 {
 		numSolutions++
 		grid.Print()
 		return
 	}
+	// copy remaining positions to next iteration, and start guessing for the position with minimum possibilities.
 	pos := copyValuesForNextIteration(grid, positions, iteration)
 	existingValue := grid[pos.X][pos.Y].IterationValues[iteration]
 	for val := range existingValue.Possible {
+		// update the cell with val for next iteration
 		nextValue := grid[pos.X][pos.Y].IterationValues[iteration+1]
 		*grid[pos.X][pos.Y].Val = val
 		*nextValue.Val = val
@@ -370,16 +412,20 @@ func solveByGuessing(grid *datatypes.Grid, positions map[datatypes.Position]bool
 				delete(nextValue.Possible, key)
 			}
 		}
-		if eliminateUsingGivenValues(grid, iteration+1, pos.X, pos.Y, val) {
-		} else {
+		// start solving using the set value.
+		if !eliminateUsingGivenValues(grid, iteration+1, pos.X, pos.Y, val) {
+			// if no conflict, then call solveByGuessing for remaining positions.
 			updatedPositions := remainingPositions(grid, positions)
 			solveByGuessing(grid, updatedPositions, iteration+1)
 		}
+		// backtrack to previous state
 		copyValuesForNextIteration(grid, positions, iteration)
 	}
 	return
 }
 
+// copyValuesForNextIteration copies the values of the cells at given positions from current iteration to next.
+// Returns the position with minimum number of possible values.
 func copyValuesForNextIteration(grid *datatypes.Grid, positions map[datatypes.Position]bool, iteration int) (minPos datatypes.Position) {
 	minPossibilities := max + 1
 	for pos := range positions {
@@ -395,6 +441,7 @@ func copyValuesForNextIteration(grid *datatypes.Grid, positions map[datatypes.Po
 	return
 }
 
+// handleError prints error message, and exits the program.
 func handleError(msg string, err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)

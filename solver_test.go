@@ -1,3 +1,6 @@
+// author: Jayant Ameta
+// https://github.com/wittyameta
+
 package main
 
 import (
@@ -5,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestVerifyElement verifies the input integer.
 func TestVerifyElement(t *testing.T) {
 	v := verifyElement("3")
 	if v != 3 {
@@ -12,12 +16,13 @@ func TestVerifyElement(t *testing.T) {
 	}
 }
 
+// TestSolve initializes and solves the grid.
 func TestSolve(t *testing.T) {
 	grid := *datatypes.InitGrid()
 	count := setInput(&grid)
 	positions := solve(&grid, count)
-	if len(positions) != 37 {
-		t.Error("Expected 37, got ", len(positions))
+	if len(positions) < 37 {
+		t.Error("Expected at least 37, got ", len(positions))
 	}
 	solveByGuessing(&grid, positions, 0)
 }
@@ -34,6 +39,7 @@ func BenchmarkSolve(b *testing.B) {
 	}
 }
 
+// setInput creates the initial grid for testing.
 func setInput(grid *datatypes.Grid) int {
 	setValue(grid, 0, 4, 4)
 	setValue(grid, 0, 5, 5)
