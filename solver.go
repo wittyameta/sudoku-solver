@@ -10,12 +10,12 @@ import (
 )
 
 // TODO
-// for all loops check if current cell needs to be excluded
-// function return instead of value
 // when num is set, check if after elimination in nearby block, the num is specific to a row/col
 const max int = 9
 const easy, medium, hard string = "easy", "medium", "hard"
+const rowIdentifier, colIdentifier, blockIdentifier string = "r", "c", "b"
 
+var initIdentifiers = map[string]bool{rowIdentifier: true, colIdentifier: true, blockIdentifier: true}
 var numSolutions int
 
 func main() {
@@ -118,12 +118,12 @@ func initialElimination(grid *datatypes.Grid, row int, column int, val int, wg *
 }
 
 func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, column int, val int) bool {
-	if eliminatePossibilities(grid, iteration, row, column, val) {
+	if eliminatePossibilities(grid, iteration, row, column, val, initIdentifiers) {
 		return true
 	}
 	for i := 1; i <= max; i++ {
 		if i != val {
-			if checkIfUniqueAndEliminate(grid, iteration, row, column, i) {
+			if checkIfUniqueAndEliminate(grid, iteration, row, column, i, initIdentifiers) {
 				return true
 			}
 		}
@@ -133,35 +133,40 @@ func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, col
 
 // Called when a number is set in a cell.
 // Eliminates the possibilities from the grid given a number at a row,col
-// TODO eliminate only for row/col/block required
-func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int, val int) (backtrack bool) {
-	for i := 0; i < max; i++ {
-		if i == row {
-			continue
-		}
-		backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, column, val)
-		if backtrack {
-			return
-		}
-	}
-	for j := 0; j < max; j++ {
-		if j == column {
-			continue
-		}
-		backtrack = eliminatePossibilitiesForPosition(grid, iteration, row, j, val)
-		if backtrack {
-			return
-		}
-	}
-	rowMin, columnMin := getBlockTopLeft(row, column)
-	for i := rowMin; i < rowMin+3; i++ {
-		for j := columnMin; j < columnMin+3; j++ {
-			if i == row && j == column {
+func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int, val int, identifiers map[string]bool) (backtrack bool) {
+	if identifiers[rowIdentifier] {
+		for i := 0; i < max; i++ {
+			if i == row {
 				continue
 			}
-			backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, j, val)
+			backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, column, val, map[string]bool{colIdentifier: true, blockIdentifier: true})
 			if backtrack {
 				return
+			}
+		}
+	}
+	if identifiers[colIdentifier] {
+		for j := 0; j < max; j++ {
+			if j == column {
+				continue
+			}
+			backtrack = eliminatePossibilitiesForPosition(grid, iteration, row, j, val, map[string]bool{rowIdentifier: true, blockIdentifier: true})
+			if backtrack {
+				return
+			}
+		}
+	}
+	if identifiers[blockIdentifier] {
+		rowMin, columnMin := getBlockTopLeft(row, column)
+		for i := rowMin; i < rowMin+3; i++ {
+			for j := columnMin; j < columnMin+3; j++ {
+				if i == row && j == column {
+					continue
+				}
+				backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, j, val, map[string]bool{rowIdentifier: true, colIdentifier: true})
+				if backtrack {
+					return
+				}
 			}
 		}
 	}
@@ -170,7 +175,7 @@ func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column
 
 // Called when a number is set in a cell.
 // Eliminates the possibilities from the grid given a number at a i,j
-func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i int, j int, val int) bool {
+func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i int, j int, val int, identifiers map[string]bool) bool {
 	cell := &grid[i][j]
 	cell.Mutex.Lock()
 	setValue, updated, backtrack := updateCell(cell, iteration, val)
@@ -179,12 +184,12 @@ func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i in
 		return true
 	}
 	if setValue > 0 {
-		if eliminatePossibilities(grid, iteration, i, j, setValue) {
+		if eliminatePossibilities(grid, iteration, i, j, setValue, identifiers) {
 			return true
 		}
 	}
 	if updated {
-		if checkIfUniqueAndEliminate(grid, iteration, i, j, val) {
+		if checkIfUniqueAndEliminate(grid, iteration, i, j, val, identifiers) {
 			return true
 		}
 	}
@@ -234,8 +239,8 @@ func updateCell(cell *datatypes.Cell, iteration int, valToDelete int) (int, bool
 	return setValue, updated, false
 }
 
-func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int, val int) bool {
-	uniquePositions, conflict := checkIfUnique(grid, iteration, val, datatypes.Position{X: i, Y: j})
+func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int, val int, identifiers map[string]bool) bool {
+	uniquePositions, conflict := checkIfUnique(grid, iteration, val, datatypes.Position{X: i, Y: j}, identifiers)
 	if conflict {
 		return true
 	}
@@ -246,11 +251,11 @@ func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int
 		setCell.Mutex.Unlock()
 		if isValueSet {
 			for _, eliminatedVal := range eliminatedValues {
-				if checkIfUniqueAndEliminate(grid, iteration, pos.X, pos.Y, eliminatedVal) {
+				if checkIfUniqueAndEliminate(grid, iteration, pos.X, pos.Y, eliminatedVal, initIdentifiers) {
 					return true
 				}
 			}
-			if eliminatePossibilities(grid, iteration, pos.X, pos.Y, val) {
+			if eliminatePossibilities(grid, iteration, pos.X, pos.Y, val, initIdentifiers) {
 				return true
 			}
 		} else {
@@ -260,95 +265,32 @@ func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int
 	return false
 }
 
-// TODO add support for row/col/block
 // Called when a cell is updated
 // If the value deleted now exists once in the row/block/col, then the cell is returned
 // returns uniquePositions array, backtrack
-func checkIfUnique(grid *datatypes.Grid, iteration int, valDeleted int, pos datatypes.Position) ([]datatypes.Position, bool) {
+func checkIfUnique(grid *datatypes.Grid, iteration int, valDeleted int, pos datatypes.Position, identifiers map[string]bool) ([]datatypes.Position, bool) {
 	var uniquePositions []datatypes.Position
 	var uniquePos datatypes.Position
 	var foundUnique, atLeastOnce bool
 
-	uniquePos, foundUnique, atLeastOnce = checkIfUniqueInRow(grid, iteration, valDeleted, pos)
-	if foundUnique {
-		uniquePositions = append(uniquePositions, uniquePos)
-	} else if !atLeastOnce {
-		return uniquePositions, true
-	}
-	uniquePos, foundUnique, atLeastOnce = checkIfUniqueInColumn(grid, iteration, valDeleted, pos)
-	if foundUnique {
-		uniquePositions = append(uniquePositions, uniquePos)
-	} else if !atLeastOnce {
-		return uniquePositions, true
-	}
-	uniquePos, foundUnique, atLeastOnce = checkIfUniqueInBlock(grid, iteration, valDeleted, pos)
-	if foundUnique {
-		uniquePositions = append(uniquePositions, uniquePos)
-	} else if !atLeastOnce {
-		return uniquePositions, true
+	for identifier := range identifiers {
+		uniquePos, foundUnique, atLeastOnce = checkIfUniqueWithIdentifier(grid, iteration, valDeleted, pos, identifier)
+		if foundUnique {
+			uniquePositions = append(uniquePositions, uniquePos)
+		} else if !atLeastOnce {
+			return uniquePositions, true
+		}
 	}
 	return uniquePositions, false
 }
 
-// returns pos, foundUnique, atLeastOnce
-func checkIfUniqueInRow(grid *datatypes.Grid, iteration int, valDeleted int, pos datatypes.Position) (datatypes.Position, bool, bool) {
-	row := pos.X
-	found := false
-	column := max
-	for j := 0; j < max; j++ {
-		val := grid[row][j].IterationValues[iteration]
-		cell := grid[row][j]
-		if *cell.Val == valDeleted {
-			return pos, false, true
-		}
-		if val.Possible[valDeleted] {
-			if found {
-				return pos, false, true
-			}
-			found = true
-			column = j
-		}
-
-	}
-	if found {
-		return datatypes.Position{X: row, Y: column}, true, true
-	}
-	return pos, false, false
-}
-
-// returns pos, foundUnique, atLeastOnce
-func checkIfUniqueInColumn(grid *datatypes.Grid, iteration int, valDeleted int, pos datatypes.Position) (datatypes.Position, bool, bool) {
-	column := pos.Y
-	found := false
-	row := max
-	for i := 0; i < max; i++ {
-		val := grid[i][column].IterationValues[iteration]
-		cell := grid[i][column]
-		if *cell.Val == valDeleted {
-			return pos, false, true
-		}
-		if val.Possible[valDeleted] {
-			if found {
-				return pos, false, true
-			}
-			found = true
-			row = i
-		}
-	}
-	if found {
-		return datatypes.Position{X: row, Y: column}, true, true
-	}
-	return pos, false, false
-}
-
-// returns pos, foundUnique, atLeastOnce
-func checkIfUniqueInBlock(grid *datatypes.Grid, iteration int, valDeleted int, pos datatypes.Position) (datatypes.Position, bool, bool) {
+func checkIfUniqueWithIdentifier(grid *datatypes.Grid, iteration int, valDeleted int, pos datatypes.Position, identifier string) (datatypes.Position, bool, bool) {
+	minPosition, maxPosition := getMinMaxPositions(identifier, pos)
 	row := pos.X
 	column := pos.Y
-	rowMin, columnMin := getBlockTopLeftFromPosition(pos)
 	found := false
-	for i := rowMin; i < rowMin+3; i++ {
-		for j := columnMin; j < columnMin+3; j++ {
+	for i := minPosition.X; i <= maxPosition.X; i++ {
+		for j := minPosition.Y; j <= maxPosition.Y; j++ {
 			val := grid[i][j].IterationValues[iteration]
 			cell := grid[i][j]
 			if *cell.Val == valDeleted {
@@ -370,10 +312,18 @@ func checkIfUniqueInBlock(grid *datatypes.Grid, iteration int, valDeleted int, p
 	return pos, false, false
 }
 
-func getBlockTopLeftFromPosition(pos datatypes.Position) (int, int) {
-	row := pos.X
-	column := pos.Y
-	return getBlockTopLeft(row, column)
+func getMinMaxPositions(identifier string, pos datatypes.Position) (minPos datatypes.Position, maxPos datatypes.Position) {
+	if identifier == rowIdentifier {
+		return datatypes.Position{X: pos.X, Y: 0}, datatypes.Position{X: pos.X, Y: max - 1}
+	}
+	if identifier == colIdentifier {
+		return datatypes.Position{X: 0, Y: pos.Y}, datatypes.Position{X: max - 1, Y: pos.Y}
+	}
+	if identifier == blockIdentifier {
+		leftX, leftY := getBlockTopLeft(pos.X, pos.Y)
+		return datatypes.Position{X: leftX, Y: leftY}, datatypes.Position{X: leftX + 2, Y: leftY + 2}
+	}
+	return datatypes.Position{X: 0, Y: 0}, datatypes.Position{X: max - 1, Y: max - 1}
 }
 
 func getBlockTopLeft(x int, y int) (int, int) {
