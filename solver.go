@@ -14,6 +14,7 @@ import (
 // function return instead of value
 // when num is set, check if after elimination in nearby block, the num is specific to a row/col
 const max int = 9
+const easy, medium, hard string = "easy", "medium", "hard"
 
 var numSolutions int
 
@@ -28,9 +29,18 @@ func main() {
 	if count < 17 || len(inputValues) < 8 {
 		handleError("Too few input values given. At least 17 values, and 8 distinct values must be given.", nil)
 	}
-	solve(&grid, count)
-	solveByGuessing(&grid, initPositions(&grid), 0)
-	fmt.Println("total solutions:", numSolutions)
+	positions := solve(&grid, count)
+	solveByGuessing(&grid, positions, 0)
+	fmt.Println("Total solutions:", numSolutions)
+	difficultyLevel := easy
+	if len(positions) > 0 {
+		if len(positions) < max {
+			difficultyLevel = medium
+		} else {
+			difficultyLevel = hard
+		}
+	}
+	fmt.Println("Difficulty level:", difficultyLevel)
 }
 
 func readRow(grid *datatypes.Grid, rownum int, inputValues map[int]bool) (count int) {
@@ -68,16 +78,14 @@ func verifyElement(elem string) int {
 	n, err := strconv.Atoi(elem)
 	if err != nil {
 		handleError("", err)
-		return 0
 	}
 	if n < 1 || n > max {
 		handleError("number should be from 1 to "+strconv.Itoa(max)+".", nil)
-		return 0
 	}
 	return n
 }
 
-func solve(grid *datatypes.Grid, count int) {
+func solve(grid *datatypes.Grid, count int) map[datatypes.Position]bool {
 	wg := sync.WaitGroup{}
 	wg.Add(count)
 	verificationCount := 0
@@ -99,6 +107,7 @@ func solve(grid *datatypes.Grid, count int) {
 		wg.Add(potentialCountDiff)
 	}
 	wg.Wait()
+	return initPositions(grid)
 }
 
 func initialElimination(grid *datatypes.Grid, row int, column int, val int, wg *sync.WaitGroup) {
@@ -443,5 +452,4 @@ func handleError(msg string, err error) {
 		fmt.Fprintf(os.Stderr, "error: %v\n", msg)
 	}
 	os.Exit(1)
-	fmt.Println("yo")
 }
