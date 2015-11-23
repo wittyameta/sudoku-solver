@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"sync"
 
@@ -9,10 +10,7 @@ import (
 )
 
 // TODO
-// min 17 digits and 8 diff digits
 // for all loops check if current cell needs to be excluded
-// backtrack
-// iter count should be max instaed of 0
 // function return instead of value
 // when num is set, check if after elimination in nearby block, the num is specific to a row/col
 const max int = 9
@@ -23,19 +21,19 @@ func main() {
 	numSolutions = 0
 	grid := *datatypes.InitGrid()
 	count := 0
+	inputValues := make(map[int]bool)
 	for i := 0; i < max; i++ {
-		count += readRow(&grid, i)
+		count += readRow(&grid, i, inputValues)
+	}
+	if count < 17 || len(inputValues) < 8 {
+		handleError("Too few input values given. At least 17 values, and 8 distinct values must be given.", nil)
 	}
 	solve(&grid, count)
-	grid.Print()
-	grid.PrintAll(0)
-	stack := initStack(&grid)
-	fmt.Println("starting stack")
-	backtrack(&grid, stack[0].BacktrackPositions, 0)
-	fmt.Println(numSolutions)
+	solveByGuessing(&grid, initPositions(&grid), 0)
+	fmt.Println("total solutions:", numSolutions)
 }
 
-func readRow(grid *datatypes.Grid, rownum int) (count int) {
+func readRow(grid *datatypes.Grid, rownum int, inputValues map[int]bool) (count int) {
 	var row [max]string
 	format := ""
 	for i := 0; i < max; i++ {
@@ -44,7 +42,7 @@ func readRow(grid *datatypes.Grid, rownum int) (count int) {
 	format += "\n"
 	n, err := fmt.Scanf(format, &row[0], &row[1], &row[2], &row[3], &row[4], &row[5], &row[6], &row[7], &row[8])
 	if n != max || err != nil {
-		panic(err)
+		handleError("", err)
 	}
 	for i, elem := range row {
 		val := grid[rownum][i].IterationValues
@@ -54,8 +52,9 @@ func readRow(grid *datatypes.Grid, rownum int) (count int) {
 				val[0] = *datatypes.SetValue(input)
 				*grid[rownum][i].Val = input
 				count++
+				inputValues[input] = true
 			} else {
-				panic("no solution possible")
+				handleError("no solution possible", nil)
 			}
 		}
 	}
@@ -68,13 +67,14 @@ func verifyElement(elem string) int {
 	}
 	n, err := strconv.Atoi(elem)
 	if err != nil {
-		panic(err)
+		handleError("", err)
+		return 0
 	}
 	if n < 1 || n > max {
-		panic("number should be from 1 to " + strconv.Itoa(max) + ".")
-	} else {
-		return n
+		handleError("number should be from 1 to "+strconv.Itoa(max)+".", nil)
+		return 0
 	}
+	return n
 }
 
 func solve(grid *datatypes.Grid, count int) {
@@ -103,22 +103,18 @@ func solve(grid *datatypes.Grid, count int) {
 
 func initialElimination(grid *datatypes.Grid, row int, column int, val int, wg *sync.WaitGroup) {
 	defer wg.Done()
-	b := *datatypes.NewBacktrack(datatypes.Position{X: row, Y: column}, *datatypes.SetValue(val))
-	// TODO backtrack necessary?
-	if eliminateUsingGivenValues(grid, 0, row, column, val, &b) {
-		panic("No solution")
+	if eliminateUsingGivenValues(grid, 0, row, column, val) {
+		handleError("No solution", nil)
 	}
 }
 
-func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, column int, val int, b *datatypes.Backtrack) bool {
-	if eliminatePossibilities(grid, iteration, row, column, val, b) {
-		fmt.Println("true from A")
+func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, column int, val int) bool {
+	if eliminatePossibilities(grid, iteration, row, column, val) {
 		return true
 	}
 	for i := 1; i <= max; i++ {
 		if i != val {
-			if checkIfUniqueAndEliminate(grid, iteration, row, column, i, b) {
-				fmt.Println("true from B")
+			if checkIfUniqueAndEliminate(grid, iteration, row, column, i) {
 				return true
 			}
 		}
@@ -129,12 +125,12 @@ func eliminateUsingGivenValues(grid *datatypes.Grid, iteration int, row int, col
 // Called when a number is set in a cell.
 // Eliminates the possibilities from the grid given a number at a row,col
 // TODO eliminate only for row/col/block required
-func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int, val int, b *datatypes.Backtrack) (backtrack bool) {
+func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column int, val int) (backtrack bool) {
 	for i := 0; i < max; i++ {
 		if i == row {
 			continue
 		}
-		backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, column, val, b)
+		backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, column, val)
 		if backtrack {
 			return
 		}
@@ -143,7 +139,7 @@ func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column
 		if j == column {
 			continue
 		}
-		backtrack = eliminatePossibilitiesForPosition(grid, iteration, row, j, val, b)
+		backtrack = eliminatePossibilitiesForPosition(grid, iteration, row, j, val)
 		if backtrack {
 			return
 		}
@@ -154,7 +150,7 @@ func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column
 			if i == row && j == column {
 				continue
 			}
-			backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, j, val, b)
+			backtrack = eliminatePossibilitiesForPosition(grid, iteration, i, j, val)
 			if backtrack {
 				return
 			}
@@ -165,7 +161,7 @@ func eliminatePossibilities(grid *datatypes.Grid, iteration int, row int, column
 
 // Called when a number is set in a cell.
 // Eliminates the possibilities from the grid given a number at a i,j
-func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i int, j int, val int, b *datatypes.Backtrack) bool {
+func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i int, j int, val int) bool {
 	cell := &grid[i][j]
 	cell.Mutex.Lock()
 	setValue, updated, backtrack := updateCell(cell, iteration, val)
@@ -174,13 +170,12 @@ func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i in
 		return true
 	}
 	if setValue > 0 {
-		if eliminatePossibilities(grid, iteration, i, j, setValue, b) {
+		if eliminatePossibilities(grid, iteration, i, j, setValue) {
 			return true
 		}
 	}
 	if updated {
-		b.BacktrackPositions[datatypes.Position{X: i, Y: j}] = true
-		if checkIfUniqueAndEliminate(grid, iteration, i, j, val, b) {
+		if checkIfUniqueAndEliminate(grid, iteration, i, j, val) {
 			return true
 		}
 	}
@@ -188,7 +183,7 @@ func eliminatePossibilitiesForPosition(grid *datatypes.Grid, iteration int, i in
 }
 
 // return valuesEliminated,isValueSet
-func setValueForCell(cell *datatypes.Cell, iteration int, setValue int, b *datatypes.Backtrack) (eliminatedValues []int, isValueSet bool) {
+func setValueForCell(cell *datatypes.Cell, iteration int, setValue int) (eliminatedValues []int, isValueSet bool) {
 	existingValue := cell.IterationValues[iteration]
 	if (existingValue.Possible[setValue] && *cell.Val == 0) || *cell.Val == setValue {
 		*existingValue.Val = setValue
@@ -198,9 +193,6 @@ func setValueForCell(cell *datatypes.Cell, iteration int, setValue int, b *datat
 				delete(existingValue.Possible, key)
 				eliminatedValues = append(eliminatedValues, key)
 			}
-		}
-		if len(eliminatedValues) > 0 {
-			b.BacktrackPositions[cell.Pos] = true
 		}
 		isValueSet = true
 		return
@@ -233,25 +225,23 @@ func updateCell(cell *datatypes.Cell, iteration int, valToDelete int) (int, bool
 	return setValue, updated, false
 }
 
-func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int, val int, b *datatypes.Backtrack) bool {
+func checkIfUniqueAndEliminate(grid *datatypes.Grid, iteration int, i int, j int, val int) bool {
 	uniquePositions, conflict := checkIfUnique(grid, iteration, val, datatypes.Position{X: i, Y: j})
 	if conflict {
-		fmt.Println("from C")
 		return true
 	}
 	for _, pos := range uniquePositions {
 		setCell := &grid[pos.X][pos.Y]
 		setCell.Mutex.Lock()
-		eliminatedValues, isValueSet := setValueForCell(setCell, iteration, val, b)
+		eliminatedValues, isValueSet := setValueForCell(setCell, iteration, val)
 		setCell.Mutex.Unlock()
 		if isValueSet {
-			b.BacktrackPositions[pos] = true
 			for _, eliminatedVal := range eliminatedValues {
-				if checkIfUniqueAndEliminate(grid, iteration, pos.X, pos.Y, eliminatedVal, b) {
+				if checkIfUniqueAndEliminate(grid, iteration, pos.X, pos.Y, eliminatedVal) {
 					return true
 				}
 			}
-			if eliminatePossibilities(grid, iteration, pos.X, pos.Y, val, b) {
+			if eliminatePossibilities(grid, iteration, pos.X, pos.Y, val) {
 				return true
 			}
 		} else {
@@ -274,21 +264,18 @@ func checkIfUnique(grid *datatypes.Grid, iteration int, valDeleted int, pos data
 	if foundUnique {
 		uniquePositions = append(uniquePositions, uniquePos)
 	} else if !atLeastOnce {
-		fmt.Println("from D")
 		return uniquePositions, true
 	}
 	uniquePos, foundUnique, atLeastOnce = checkIfUniqueInColumn(grid, iteration, valDeleted, pos)
 	if foundUnique {
 		uniquePositions = append(uniquePositions, uniquePos)
 	} else if !atLeastOnce {
-		fmt.Println("from E")
 		return uniquePositions, true
 	}
 	uniquePos, foundUnique, atLeastOnce = checkIfUniqueInBlock(grid, iteration, valDeleted, pos)
 	if foundUnique {
 		uniquePositions = append(uniquePositions, uniquePos)
 	} else if !atLeastOnce {
-		fmt.Println("from F")
 		return uniquePositions, true
 	}
 	return uniquePositions, false
@@ -317,9 +304,6 @@ func checkIfUniqueInRow(grid *datatypes.Grid, iteration int, valDeleted int, pos
 	if found {
 		return datatypes.Position{X: row, Y: column}, true, true
 	}
-	fmt.Println("from G-start")
-	fmt.Println(iteration, valDeleted, pos)
-	fmt.Println("from G-end")
 	return pos, false, false
 }
 
@@ -397,79 +381,67 @@ func remainingPositions(grid *datatypes.Grid, positions map[datatypes.Position]b
 	return emptyPositions
 }
 
-func initStack(grid *datatypes.Grid) (stack datatypes.Stack) {
+func initPositions(grid *datatypes.Grid) map[datatypes.Position]bool {
 	positions := make(map[datatypes.Position]bool)
 	index := 0
 	for i := 0; i < max; i++ {
 		for j := 0; j < max; j++ {
-			positions[grid[i][j].Pos] = true
+			positions[datatypes.Position{X: i, Y: j}] = true
 			index++
 		}
 	}
-	backtrack := *datatypes.NewBacktrack(datatypes.Position{X: max, Y: max}, *datatypes.InitValue())
-	backtrack.BacktrackPositions = remainingPositions(grid, positions)
-	stack.Push(backtrack)
+	return remainingPositions(grid, positions)
+}
+
+func solveByGuessing(grid *datatypes.Grid, positions map[datatypes.Position]bool, iteration int) {
+	// grid copy
+	if len(positions) == 0 {
+		numSolutions++
+		grid.Print()
+		return
+	}
+	pos := copyValuesForNextIteration(grid, positions, iteration)
+	existingValue := grid[pos.X][pos.Y].IterationValues[iteration]
+	for val := range existingValue.Possible {
+		nextValue := grid[pos.X][pos.Y].IterationValues[iteration+1]
+		*grid[pos.X][pos.Y].Val = val
+		*nextValue.Val = val
+		for key := range nextValue.Possible {
+			if key != val {
+				delete(nextValue.Possible, key)
+			}
+		}
+		if eliminateUsingGivenValues(grid, iteration+1, pos.X, pos.Y, val) {
+		} else {
+			updatedPositions := remainingPositions(grid, positions)
+			solveByGuessing(grid, updatedPositions, iteration+1)
+		}
+		copyValuesForNextIteration(grid, positions, iteration)
+	}
 	return
 }
 
-func backtrack(grid *datatypes.Grid, positions map[datatypes.Position]bool, iteration int) {
-	// grid copy
-	copyValuesForNextIteration(grid, positions, iteration)
-	for pos := range positions {
-		fmt.Println("pos", pos)
-		existingValue := grid[pos.X][pos.Y].IterationValues[iteration]
-		fmt.Println(existingValue)
-		fmt.Println(grid[pos.X][pos.Y].IterationValues[iteration])
-		for val := range existingValue.Possible {
-			nextValue := grid[pos.X][pos.Y].IterationValues[iteration+1]
-			fmt.Println("val", val)
-			*grid[pos.X][pos.Y].Val = val        // TODO 0
-			setValue := *datatypes.SetValue(val) // TODO 1
-			*nextValue.Val = val                 // TODO 2
-			for key := range nextValue.Possible {
-				if key != val {
-					delete(nextValue.Possible, key) // TODO 3
-				}
-			}
-			b := *datatypes.NewBacktrack(pos, setValue) // TODO 4
-			if eliminateUsingGivenValues(grid, iteration+1, pos.X, pos.Y, val, &b) {
-				// TODO revert todo4,1
-			} else {
-				updatedPositions := remainingPositions(grid, positions)
-				if len(updatedPositions) == 0 {
-					if numSolutions > 0 {
-						panic("multiple solutions")
-					}
-					numSolutions++
-					fmt.Println("success at ", iteration)
-					grid.Print()
-				} else {
-					fmt.Println("go next level. remaining cells:", len(updatedPositions))
-					backtrack(grid, updatedPositions, iteration+1)
-				}
-				// next val in stack
-			}
-			copyValuesForNextIteration(grid, positions, iteration)
-		}
-		return
-	}
-}
-
-func copyValuesForNextIteration(grid *datatypes.Grid, positions map[datatypes.Position]bool, iteration int) {
+func copyValuesForNextIteration(grid *datatypes.Grid, positions map[datatypes.Position]bool, iteration int) (minPos datatypes.Position) {
+	minPossibilities := max + 1
 	for pos := range positions {
 		cell := grid[pos.X][pos.Y]
 		cell.IterationValues[iteration+1] = *datatypes.CopyValue(cell.IterationValues[iteration])
 		*cell.Val = 0
+		countPossibilities := len(cell.IterationValues[iteration].Possible)
+		if countPossibilities < minPossibilities {
+			minPossibilities = countPossibilities
+			minPos = pos
+		}
 	}
+	return
 }
 
-func backtrack1() {
-	// increment iter count
-	// TODO sorted with length of possible
-	// select a pos
-	// TODO sort possibilities
-	// select a value
-	// set the value to pos
-	// call eliminateUsingGivenValues
-	//
+func handleError(msg string, err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	} else {
+		fmt.Fprintf(os.Stderr, "error: %v\n", msg)
+	}
+	os.Exit(1)
+	fmt.Println("yo")
 }
